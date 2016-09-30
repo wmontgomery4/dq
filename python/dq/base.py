@@ -194,6 +194,51 @@ class Experiment():
         # TODO: remove need for 'on_unused_input'
         self.cost = th.function([x, u, site_xpos], c, on_unused_input='ignore')
 
+    def _pack_obs(self):
+        """ Pack the current world state into observation vector. """
+        # TODO: add this back into mjcpy2, way faster.
+        rc = self.rc
+        fields = rc['obs_fields']
+        dims = rc['obs_dims']
+
+        data = self.world.get_data()
+        model = self.world.get_model()
+
+        obs = np.array([])
+        if 'qpos' in fields:
+            obs = np.r_[obs, data['qpos'][0]]
+        if 'qvel' in fields:
+            obs = np.r_[obs, data['qvel'][0]]
+        if 'xipos' in fields:
+            xipos = data['xipos'][1:] # Skip worldbody.
+            for pos in xipos:
+                for j in range(3): # Might mask some of dims
+                    if dims[j]:
+                        obs = np.r_[obs, pos[j]]
+        if 'ximat' in fields:
+            ximat = data['ximat'][1:] # Skip worldbody.
+            for mat in ximat:
+                for j in range(3): # Might mask some of dims
+                    for k in range(3):
+                        if dims[j] and dims[k]:
+                            obs = np.r_[obs, mat[3*j+k]]
+        if 'site_xpos' in fields:
+            sites = data['site_xpos']
+            for site in sites:
+                for j in range(3): # Might mask some of dims
+                    if dims[j]:
+                        obs = np.r_[obs, site[j]]
+        if 'to_target' in fields:
+            sites = data['site_xpos']
+            assert sites.shape[0] == 2
+            diff = sites[1] - site[0]
+            for j in range(3): # Might mask some of dims
+                if dims[j]:
+                    obs = np.r_[obs, diff[j]]
+
+        assert obs.size == self.dO
+        return obs
+
     def _episode(self):
         rc = self.rc
 
@@ -215,7 +260,7 @@ class Experiment():
 
         # Run an episode, storing costs/errors
         X[0] = x0
-        O[0] = self.world.pack_obs(rc['obs_fields'], rc['obs_dims'], self.dO)
+        O[0] = self._pack_obs()
         for t in range(T):
             # take step with current net and store transition
             # note: O[t, t+1] makes sure that input is 2D (since net takes batches)
@@ -229,7 +274,7 @@ class Experiment():
                 U[t] = np.maximum(U[t], -rc['ctrl_limits'])
 
             X[t+1], site_xpos = self.world.step(X[t], U[t])
-            O[t+1] = self.world.pack_obs(rc['obs_fields'], rc['obs_dims'], self.dO)
+            O[t+1] = self._pack_obs()
 
             # TODO: change rc['cost'] to make this better
             C[t] = self.cost(X[t+1], U[t], site_xpos)

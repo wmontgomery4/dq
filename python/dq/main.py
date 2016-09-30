@@ -56,7 +56,7 @@ def main():
     # Run experiment (will also analyze)
     if args.train:
         # Double check before overwriting old experiment
-        if os.listdir(data_dir):
+        if os.path.exists(data_dir) and os.listdir(data_dir):
             yn = raw_input("Data already exists, would you like to overwrite (y/n)? ")
             if yn != 'y':
                 sys.exit()
@@ -149,43 +149,44 @@ def main():
                 world.plot(x0)
 
     # Exit 4) Plot testing episodes using most recent net
-    # TODO: this is really messy
+    # TODO: this won't work without adding pack_obs back to mjcpy2
     if args.plot_test:
-        world = mj.MJCWorld(rc['model_file'])
-        with open('{}/episodes.pkl'.format(data_dir), 'rb') as f:
-            eps = cPickle.load(f)
-        with open('{}/nets_{}_episodes.pkl'.format(data_dir, len(eps)), 'rb') as f:
-            net, _ = cPickle.load(f)
-
-        dX = eps[0][0].size
-        dO = 0
-        ndims = np.sum(rc['obs_dims'])
-        model = world.get_model()
-        fields = rc['obs_fields']
-        if 'qpos' in fields:
-            dO += model['nq']
-        if 'qvel' in fields:
-            dO += model['nv']
-        if 'xipos' in fields:
-            dO += ndims*(model['nbody'] - 1)
-        if 'ximat' in fields:
-            dO += ndims*ndims*(model['nbody'] - 1)
-        if 'site_xpos' in fields:
-            dO += ndims*model['nsite']
-        if 'to_target' in fields:
-            dO += ndims
-
-        # Run episodes until the user quits
-        while True:
-            x0 = rc['x0'] + rc['x0_noise']*2*(np.random.rand(dX) - 0.5)
-            world.plot(x0)
-
-            for i in range(rc['len_episode']):
-                obs = world.pack_obs(rc['obs_fields'], rc['obs_dims'], dO)
-                u = net.U(obs[None, :])[0]
-                x1, _ = world.step(x0, u)
-                x0 = x1
-                world.plot(x0)
+        raise NotImplementedError("TODO: need to fix pack_obs for this")
+#        world = mj.MJCWorld(rc['model_file'])
+#        with open('{}/episodes.pkl'.format(data_dir), 'rb') as f:
+#            eps = cPickle.load(f)
+#        with open('{}/nets_{}_episodes.pkl'.format(data_dir, len(eps)), 'rb') as f:
+#            net, _ = cPickle.load(f)
+#
+#        dX = eps[0][0].size
+#        dO = 0
+#        ndims = np.sum(rc['obs_dims'])
+#        model = world.get_model()
+#        fields = rc['obs_fields']
+#        if 'qpos' in fields:
+#            dO += model['nq']
+#        if 'qvel' in fields:
+#            dO += model['nv']
+#        if 'xipos' in fields:
+#            dO += ndims*(model['nbody'] - 1)
+#        if 'ximat' in fields:
+#            dO += ndims*ndims*(model['nbody'] - 1)
+#        if 'site_xpos' in fields:
+#            dO += ndims*model['nsite']
+#        if 'to_target' in fields:
+#            dO += ndims
+#
+#        # Run episodes until the user quits
+#        while True:
+#            x0 = rc['x0'] + rc['x0_noise']*2*(np.random.rand(dX) - 0.5)
+#            world.plot(x0)
+#
+#            for i in range(rc['len_episode']):
+#                obs = world.pack_obs(rc['obs_fields'], rc['obs_dims'], dO)
+#                u = net.U(obs[None, :])[0]
+#                x1, _ = world.step(x0, u)
+#                x0 = x1
+#                world.plot(x0)
 
     else:
         sys.exit("Run with '--help'")
